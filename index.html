@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HerraTools - Marketplace Interactivo</title>
+    <!-- Chosen Palette: Modern Industrial (Azul Oscuro: #1e3a8a, Amarillo/Ámbar: #f59e0b, Gris Plateado: #9ca3af, Negro: #111827, Fondo Claro: #f8f8f8) -->
+    <!-- Application Structure Plan: Se diseñó una Single-Page Application (SPA) con múltiples "vistas" (secciones <div> controladas por JS). Las vistas principales son: Inicio, Catálogo de Productos (con filtros dinámicos), Detalle de Producto, Carrito, Proceso de Pago simulado y un Dashboard de Vendedor con gráficos. Esta estructura fue elegida porque traduce directamente el flujo de usuario de un marketplace (descubrimiento, selección, compra) descrito en el reporte, permitiendo una experiencia fluida y sin recargas de página. El dashboard se incluye para demostrar la capacidad de visualización de datos cuantitativos, una característica clave de las plataformas de e-commerce modernas. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Visión del Marketplace. Goal: Informar/Enganchar. Method: Página de Inicio con secciones para categorías y destacados. Interaction: Enlaces de navegación. Justification: Establece la marca y guía al usuario.
+        - Report Info: Búsqueda Facetada. Goal: Organizar/Comparar. Method: Panel de filtros (HTML) y cuadrícula de productos (CSS Grid/Flex). Interaction: Filtros de JS que ocultan/muestran productos. Justification: Implementa la funcionalidad de filtrado dinámico, crítica para la UX en e-commerce.
+        - Report Info: Proceso de pago. Goal: Guiar al usuario. Method: Simulación de múltiples pasos con JS. Interaction: Botones para avanzar entre los pasos de envío, pago y confirmación. Justification: Muestra el flujo de checkout descrito.
+        - Report Info: Portal de vendedor (datos). Goal: Visualizar datos. Method: Gráficos de Barras y Donut con Chart.js (Canvas). Interaction: Tooltips al pasar el ratón. Justification: Demuestra cómo se pueden presentar métricas de ventas, una capacidad esencial del marketplace.
+        - Report Info: Asistente IA. Goal: Asistir/Enganchar. Method: Modal con interfaz de chat. Interaction: El usuario puede escribir y recibe una respuesta simulada por JS. Justification: Prototipa una de las características avanzadas y de alto impacto del reporte.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8f8f8; }
+        .view { display: none; }
+        .view.active { display: block; }
+        .line-clamp-2 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="app" class="relative">
+        <!-- Header -->
+        <header class="bg-blue-900 text-white p-4 shadow-lg sticky top-0 z-40">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-3xl font-extrabold cursor-pointer" onclick="app.navigateTo('home')">HerraTools</h1>
+                <nav class="hidden md:flex items-center space-x-6 text-lg">
+                    <a href="#" class="hover:text-amber-400 transition duration-300" onclick="app.navigateTo('home')">Inicio</a>
+                    <a href="#" class="hover:text-amber-400 transition duration-300" onclick="app.navigateTo('products')">Productos</a>
+                    <a href="#" class="hover:text-amber-400 transition duration-300" onclick="app.navigateTo('dashboard')">Dashboard Vendedor</a>
+                    <a href="#" class="hover:text-amber-400 transition duration-300 relative" onclick="app.navigateTo('cart')">
+                        <span>🛒 Carrito</span>
+                        <span id="cart-count" class="absolute -top-2 -right-4 bg-amber-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
+                    </a>
+                </nav>
+                <button class="md:hidden" onclick="app.toggleMobileMenu()">
+                    <span class="text-3xl">☰</span>
+                </button>
+            </div>
+            <div id="mobile-menu" class="hidden md:hidden mt-4 text-center">
+                 <a href="#" class="block py-2 hover:bg-blue-800 rounded" onclick="app.navigateTo('home'); app.toggleMobileMenu();">Inicio</a>
+                 <a href="#" class="block py-2 hover:bg-blue-800 rounded" onclick="app.navigateTo('products'); app.toggleMobileMenu();">Productos</a>
+                 <a href="#" class="block py-2 hover:bg-blue-800 rounded" onclick="app.navigateTo('dashboard'); app.toggleMobileMenu();">Dashboard Vendedor</a>
+                 <a href="#" class="block py-2 hover:bg-blue-800 rounded" onclick="app.navigateTo('cart'); app.toggleMobileMenu();">Carrito</a>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main>
+            <!-- Home View -->
+            <section id="home-view" class="view active">
+                <div class="bg-blue-900 text-white text-center py-20 px-4">
+                    <div class="container mx-auto">
+                        <h2 class="text-5xl font-extrabold mb-4">Bienvenido a HerraTools</h2>
+                        <p class="text-xl max-w-3xl mx-auto mb-8">El marketplace moderno para todas tus necesidades de ferretería. Robusto, fiable y diseñado para profesionales y aficionados por igual.</p>
+                        <button class="bg-amber-500 hover:bg-amber-600 text-blue-900 font-bold py-3 px-8 rounded-lg shadow-lg transition duration-300 transform hover:scale-105" onclick="app.navigateTo('products')">
+                            Explorar Catálogo
+                        </button>
+                    </div>
+                </div>
+                <div class="container mx-auto p-8">
+                     <div class="text-center mb-12">
+                        <h3 class="text-3xl font-bold mb-2">Características Clave</h3>
+                        <p class="text-gray-700">Representando la visión de un marketplace de primera categoría.</p>
+                    </div>
+                    <div class="grid md:grid-cols-3 gap-8">
+                        <div class="bg-white p-6 rounded-xl shadow-lg text-center">
+                             <div class="text-4xl mb-4">⚙️</div>
+                             <h4 class="text-xl font-bold mb-2">Catálogo Extenso</h4>
+                             <p class="text-gray-700">Explora un catálogo de productos con filtros avanzados y dinámicos para encontrar exactamente lo que necesitas.</p>
+                        </div>
+                         <div class="bg-white p-6 rounded-xl shadow-lg text-center">
+                             <div class="text-4xl mb-4">📈</div>
+                             <h4 class="text-xl font-bold mb-2">Dashboard de Vendedor</h4>
+                             <p class="text-gray-700">Visualiza métricas de ventas y rendimiento con gráficos interactivos. Una herramienta esencial para los vendedores.</p>
+                        </div>
+                         <div class="bg-white p-6 rounded-xl shadow-lg text-center">
+                             <div class="text-4xl mb-4">🤖</div>
+                             <h4 class="text-xl font-bold mb-2">Asistente Virtual IA</h4>
+                             <p class="text-gray-700">Obtén ayuda y recomendaciones de productos con nuestro asistente inteligente (simulado).</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Products View -->
+            <section id="products-view" class="view">
+                <div class="container mx-auto p-4 md:p-8">
+                     <h2 class="text-4xl font-extrabold text-center mb-8">Catálogo de Productos</h2>
+                     <p class="text-center text-gray-700 max-w-2xl mx-auto mb-10">Utiliza los filtros para refinar tu búsqueda. El listado de productos se actualiza dinámicamente para reflejar tus selecciones, demostrando la capacidad de búsqueda facetada del marketplace.</p>
+                    <div class="flex flex-col md:flex-row gap-8">
+                        <!-- Filters -->
+                        <aside class="md:w-1/4">
+                            <div class="bg-white p-6 rounded-xl shadow-lg sticky top-24">
+                                <h3 class="text-xl font-bold mb-4">Filtros</h3>
+                                <div class="space-y-6">
+                                    <div>
+                                        <label for="filter-search" class="font-semibold block mb-2 text-gray-700">Buscar</label>
+                                        <input type="text" id="filter-search" placeholder="Ej: Taladro Bosch" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 border-gray-400">
+                                    </div>
+                                    <div>
+                                        <label for="filter-category" class="font-semibold block mb-2 text-gray-700">Categoría</label>
+                                        <select id="filter-category" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 border-gray-400">
+                                            <option value="all">Todas</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="filter-brand" class="font-semibold block mb-2 text-gray-700">Marca</label>
+                                        <select id="filter-brand" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 border-gray-400">
+                                            <option value="all">Todas</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="filter-price" class="font-semibold block mb-2 text-gray-700">Precio Máximo: <span id="price-value">$500</span></label>
+                                        <input type="range" id="filter-price" min="0" max="500" value="500" step="10" class="w-full accent-blue-900">
+                                    </div>
+                                    <button class="w-full bg-blue-900 text-white py-2 rounded-lg font-bold hover:bg-gray-700 transition duration-300" onclick="app.applyFilters()">Aplicar Filtros</button>
+                                </div>
+                            </div>
+                        </aside>
+                        <!-- Product Grid -->
+                        <main id="product-grid" class="md:w-3/4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <!-- Products will be injected here by JS -->
+                        </main>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Product Detail View -->
+            <section id="product-detail-view" class="view">
+                <div class="container mx-auto p-4 md:p-8">
+                     <!-- Content will be injected here by JS -->
+                </div>
+            </section>
+
+            <!-- Cart View -->
+            <section id="cart-view" class="view">
+                 <div class="container mx-auto p-4 md:p-8">
+                    <h2 class="text-4xl font-extrabold text-center mb-8">Tu Carrito de Compras</h2>
+                    <div id="cart-items-container" class="bg-white p-6 rounded-xl shadow-lg text-gray-900">
+                        <!-- Cart items will be injected here by JS -->
+                    </div>
+                 </div>
+            </section>
+
+            <!-- Checkout View -->
+            <section id="checkout-view" class="view">
+                <div class="container mx-auto p-4 md:p-8 max-w-3xl">
+                     <h2 class="text-4xl font-extrabold text-center mb-8">Proceso de Pago</h2>
+                     <p class="text-center text-gray-700 mb-8">Este es un flujo de pago simulado. Demuestra el progreso a través de múltiples pasos, una característica clave para una buena experiencia de usuario.</p>
+                     
+                     <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <!-- Step Indicator -->
+                        <div class="flex justify-between mb-8 border-b pb-4">
+                            <div id="step-indicator-1" class="text-center font-bold text-blue-900 border-b-4 border-blue-900 w-1/3">1. Envío</div>
+                            <div id="step-indicator-2" class="text-center font-semibold text-gray-500 w-1/3">2. Pago</div>
+                            <div id="step-indicator-3" class="text-center font-semibold text-gray-500 w-1/3">3. Confirmación</div>
+                        </div>
+
+                        <!-- Step 1: Shipping -->
+                        <div id="checkout-step-1" class="step active text-gray-900">
+                             <h3 class="text-2xl font-bold mb-4">Información de Envío</h3>
+                             <form class="space-y-4">
+                                <div>
+                                    <label for="name" class="block font-semibold">Nombre Completo</label>
+                                    <input type="text" id="name" class="w-full p-2 border rounded-lg mt-1 border-gray-400">
+                                </div>
+                                <div>
+                                    <label for="address" class="block font-semibold">Dirección</label>
+                                    <input type="text" id="address" class="w-full p-2 border rounded-lg mt-1 border-gray-400">
+                                </div>
+                                <button type="button" class="w-full bg-blue-900 text-white py-3 rounded-lg font-bold hover:bg-gray-700 transition duration-300" onclick="app.nextCheckoutStep(2)">Continuar al Pago</button>
+                             </form>
+                        </div>
+
+                        <!-- Step 2: Payment -->
+                        <div id="checkout-step-2" class="step text-gray-900">
+                            <h3 class="text-2xl font-bold mb-4">Método de Pago</h3>
+                            <div class="space-y-4">
+                                <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 border-gray-400"><input type="radio" name="payment" class="mr-3 accent-blue-900"> Mercado Pago</label>
+                                <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 border-gray-400"><input type="radio" name="payment" class="mr-3 accent-blue-900"> PayPal</label>
+                                <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 border-gray-400"><input type="radio" name="payment" class="mr-3 accent-blue-900"> Bancos Locales (BROU, Itaú)</label>
+                                <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 border-gray-400"><input type="radio" name="payment" class="mr-3 accent-blue-900"> Google Pay / Apple Pay</label>
+                            </div>
+                            <button type="button" class="mt-6 w-full bg-blue-900 text-white py-3 rounded-lg font-bold hover:bg-gray-700 transition duration-300" onclick="app.nextCheckoutStep(3)">Revisar y Confirmar</button>
+                        </div>
+
+                        <!-- Step 3: Confirmation -->
+                        <div id="checkout-step-3" class="step text-center text-gray-900">
+                            <div class="text-6xl mb-4">✅</div>
+                            <h3 class="text-2xl font-bold mb-4">¡Pedido Confirmado!</h3>
+                            <p class="text-gray-700 mb-6">Gracias por tu compra. Recibirás una confirmación por correo electrónico en breve.</p>
+                            <button type="button" class="bg-amber-500 hover:bg-amber-600 text-blue-900 font-bold py-3 px-8 rounded-lg" onclick="app.navigateTo('home')">Volver al Inicio</button>
+                        </div>
+                     </div>
+                </div>
+            </section>
+
+            <!-- Seller Dashboard View -->
+            <section id="dashboard-view" class="view">
+                 <div class="container mx-auto p-4 md:p-8">
+                     <h2 class="text-4xl font-extrabold text-center mb-8">Dashboard de Vendedor</h2>
+                     <p class="text-center text-gray-700 max-w-2xl mx-auto mb-10">Esta sección demuestra cómo se pueden presentar datos cuantitativos del marketplace, como las métricas de ventas. Los gráficos son interactivos y están renderizados con Chart.js en un elemento Canvas.</p>
+                     <div class="grid md:grid-cols-2 gap-8">
+                        <div class="bg-white p-6 rounded-xl shadow-lg text-gray-900">
+                             <h3 class="text-xl font-bold mb-4">Ventas Mensuales (Simulado)</h3>
+                             <div class="chart-container">
+                                <canvas id="salesChart"></canvas>
+                             </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-lg text-gray-900">
+                            <h3 class="text-xl font-bold mb-4">Ventas por Categoría (Simulado)</h3>
+                             <div class="chart-container">
+                                <canvas id="categoryChart"></canvas>
+                            </div>
+                        </div>
+                     </div>
+                 </div>
+            </section>
+        </main>
+
+        <!-- AI Assistant Floating Button and Modal -->
+        <div id="ai-assistant-button" class="fixed bottom-6 right-6 bg-blue-900 text-white rounded-full h-16 w-16 flex items-center justify-center shadow-lg cursor-pointer transform hover:scale-110 transition" onclick="app.toggleAiAssistant()">
+             <span class="text-3xl">🤖</span>
+        </div>
+        <div id="ai-assistant-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+             <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg m-4 text-gray-900">
+                <div class="flex justify-between items-center p-4 border-b border-gray-400">
+                    <h3 class="text-xl font-bold">Asistente IA de HerraTools</h3>
+                    <button class="text-2xl" onclick="app.toggleAiAssistant()">×</button>
+                </div>
+                <div class="p-6 h-96 overflow-y-auto" id="ai-chat-body">
+                    <div class="text-left mb-4">
+                        <div class="inline-block bg-gray-200 rounded-lg p-3">Hola, ¿en qué puedo ayudarte hoy? Por ejemplo, puedes preguntar: "¿Qué taladro me recomiendas para concreto?".</div>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-gray-400">
+                    <form class="flex space-x-2" onsubmit="app.sendAiMessage(event)">
+                        <input type="text" id="ai-input" placeholder="Escribe tu mensaje..." class="flex-grow p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 border-gray-400">
+                        <button type="submit" class="bg-blue-900 text-white px-6 rounded-lg font-bold hover:bg-gray-700 transition">Enviar</button>
+                    </form>
+                </div>
+             </div>
+        </div>
+    </div>
+
+    <script>
+        const App = function() {
+            this.state = {
+                products: [],
+                cart: [],
+                currentView: 'home',
+            };
+
+            this.init = () => {
+                this.loadProducts();
+                this.updateCartCount();
+                this.setupEventListeners();
+                this.initCharts();
+            };
+            
+            this.loadProducts = () => {
+                this.state.products = [
+                    { id: 1, name: "Taladro Inalámbrico 18V", description: "Potente taladro para uso doméstico y profesional.", price: 150, imageUrl: "https://placehold.co/400x300/1E3A8A/FFFFFF?text=Taladro", category: "Herramientas Eléctricas", brand: "Bosch" },
+                    { id: 2, name: "Martillo de Uña Curva", description: "Martillo de acero forjado con mango ergonómico.", price: 25, imageUrl: "https://placehold.co/400x300/1E3A8A/FFFFFF?text=Martillo", category: "Herramientas Manuales", brand: "Stanley" },
+                    { id: 3, name: "Set de Destornilladores (10 pzas)", description: "Juego completo de destornilladores Phillips y planos.", price: 45, imageUrl: "https://placehold.co/400x300/1E3A8A/FFFFFF?text=Destornilladores", category: "Herramientas Manuales", brand: "Black+Decker" },
+                    { id: 4, name: "Pintura Acrílica Blanca (1 galón)", description: "Pintura de alta calidad para interiores y exteriores.", price: 55, imageUrl: "https://placehold.co/400x300/1E3A8A/FFFFFF?text=Pintura", category: "Pinturas", brand: "PinturasUY" },
+                    { id: 5, name: "Sierra Circular Eléctrica 1500W", description: "Sierra potente para cortes precisos en madera y otros materiales.", price: 220, imageUrl: "https://placehold.co/400x300/1E3A8A/FFFFFF?text=Sierra", category: "Herramientas Eléctricas", brand: "DeWalt" },
+                    { id: 6, name: "Tornillos para Madera (Caja 200un)", description: "Tornillos de cabeza plana para madera, diversos tamaños.", price: 15, imageUrl: "https://placehold.co/400x300/1E3A8A/FFFFFF?text=Tornillos", category: "Fijaciones", brand: "FixIt" },
+                    { id: 7, name: "Nivel Láser Autonivelante", description: "Proyecta líneas horizontales y verticales con alta precisión.", price: 180, imageUrl: "https://placehold.co/400x300/1E3A8A/FFFFFF?text=Nivel+Láser", category: "Herramientas de Medición", brand: "Bosch" },
+                    { id: 8, name: "Caja de Herramientas Metálica", description: "Caja robusta con 3 compartimentos para organizar herramientas.", price: 95, imageUrl: "https://placehold.co/400x300/1E3A8A/FFFFFF?text=Caja", category: "Almacenamiento", brand: "Stanley" },
+                ];
+                
+                const categories = ['all', ...new Set(this.state.products.map(p => p.category))];
+                const brands = ['all', ...new Set(this.state.products.map(p => p.brand))];
+
+                const categorySelect = document.getElementById('filter-category');
+                categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c === 'all' ? 'Todas las Categorías' : c}</option>`).join('');
+                
+                const brandSelect = document.getElementById('filter-brand');
+                brandSelect.innerHTML = brands.map(b => `<option value="${b}">${b === 'all' ? 'Todas las Marcas' : b}</option>`).join('');
+
+                this.renderProducts(this.state.products);
+            };
+
+            this.renderProducts = (products) => {
+                const grid = document.getElementById('product-grid');
+                if (!grid) return;
+                grid.innerHTML = products.map(product => `
+                    <div class="bg-white rounded-xl shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 cursor-pointer" onclick="app.navigateTo('product-detail', ${product.id})">
+                        <img src="${product.imageUrl}" alt="${product.name}" class="w-full h-48 object-cover">
+                        <div class="p-5">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2 truncate">${product.name}</h3>
+                            <p class="text-sm text-gray-700 line-clamp-2">${product.description}</p>
+                            <div class="flex justify-between items-center mt-4">
+                                <span class="text-xl font-extrabold text-blue-900">$${product.price.toFixed(2)}</span>
+                                <button class="bg-amber-500 text-blue-900 font-bold px-4 py-2 rounded-lg hover:bg-amber-600 transition" onclick="event.stopPropagation(); app.addToCart(${product.id})">Añadir</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                 if(products.length === 0){
+                    grid.innerHTML = `<p class="col-span-full text-center text-gray-700">No se encontraron productos con los filtros seleccionados.</p>`;
+                }
+            };
+            
+            this.navigateTo = (viewId, param = null) => {
+                document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+                document.getElementById(`${viewId}-view`).classList.add('active');
+                window.scrollTo(0, 0);
+
+                if (viewId === 'product-detail' && param) {
+                    this.renderProductDetail(param);
+                }
+                if(viewId === 'cart') {
+                    this.renderCart();
+                }
+                if(viewId === 'checkout') {
+                    this.resetCheckout();
+                }
+            };
+
+            this.renderProductDetail = (productId) => {
+                const product = this.state.products.find(p => p.id === productId);
+                const container = document.getElementById('product-detail-view');
+                if (!product || !container) return;
+
+                container.innerHTML = `
+                    <button class="bg-gray-400 hover:bg-gray-500 text-gray-900 font-bold py-2 px-4 rounded-lg mb-6 transition duration-300" onclick="app.navigateTo('products')">← Volver a Productos</button>
+                    <div class="bg-white rounded-xl shadow-lg p-8 md:flex gap-8">
+                        <div class="md:w-1/2">
+                            <img src="${product.imageUrl}" alt="${product.name}" class="w-full rounded-lg shadow-md">
+                        </div>
+                        <div class="md:w-1/2 mt-6 md:mt-0">
+                            <span class="text-sm font-semibold text-blue-900">${product.category}</span>
+                            <h2 class="text-4xl font-extrabold my-2 text-gray-900">${product.name}</h2>
+                            <p class="text-gray-700 text-lg mb-6">${product.description}</p>
+                            <div class="text-5xl font-extrabold text-blue-900 mb-6">$${product.price.toFixed(2)}</div>
+                            <button class="w-full bg-amber-500 hover:bg-amber-600 text-blue-900 font-bold py-4 px-6 rounded-lg text-lg shadow-lg" onclick="app.addToCart(${product.id})">
+                                Añadir al Carrito
+                            </button>
+                            <div class="mt-6 border-t border-gray-400 pt-4 text-gray-900">
+                                <p><strong>Marca:</strong> ${product.brand}</p>
+                                <p><strong>Disponibilidad:</strong> En Stock</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            };
+
+            this.addToCart = (productId) => {
+                const product = this.state.products.find(p => p.id === productId);
+                if (!product) return;
+                
+                const cartItem = this.state.cart.find(item => item.id === productId);
+                if (cartItem) {
+                    cartItem.quantity++;
+                } else {
+                    this.state.cart.push({ ...product, quantity: 1 });
+                }
+                this.updateCartCount();
+            };
+
+            this.updateCartCount = () => {
+                const count = this.state.cart.reduce((total, item) => total + item.quantity, 0);
+                document.getElementById('cart-count').innerText = count;
+            };
+
+            this.renderCart = () => {
+                const container = document.getElementById('cart-items-container');
+                if(this.state.cart.length === 0){
+                    container.innerHTML = `
+                        <div class="text-center py-10">
+                            <p class="text-xl text-gray-700 mb-4">Tu carrito está vacío.</p>
+                            <button class="bg-blue-900 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-700 transition duration-300" onclick="app.navigateTo('products')">Ver Productos</button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const itemsHtml = this.state.cart.map(item => `
+                    <div class="flex items-center justify-between border-b border-gray-400 py-4">
+                        <div class="flex items-center gap-4">
+                            <img src="${item.imageUrl}" alt="${item.name}" class="w-20 h-20 object-cover rounded-lg">
+                            <div>
+                                <h4 class="font-bold text-gray-900">${item.name}</h4>
+                                <p class="text-sm text-gray-700">$${item.price.toFixed(2)}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <input type="number" value="${item.quantity}" min="1" class="w-16 p-2 border rounded-lg text-center border-gray-400 text-gray-900" onchange="app.updateCartQuantity(${item.id}, this.value)">
+                            <span class="font-bold w-24 text-right text-gray-900">$${(item.price * item.quantity).toFixed(2)}</span>
+                            <button class="text-red-500 hover:text-red-700 font-bold" onclick="app.removeFromCart(${item.id})">×</button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                const total = this.state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                
+                container.innerHTML = `
+                    ${itemsHtml}
+                    <div class="flex justify-end items-center mt-6">
+                        <span class="text-xl font-bold text-gray-900">Total:</span>
+                        <span class="text-2xl font-extrabold text-blue-900 ml-4">$${total.toFixed(2)}</span>
+                    </div>
+                    <div class="mt-6 text-right">
+                        <button class="bg-amber-500 text-blue-900 font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-amber-600 transition duration-300" onclick="app.navigateTo('checkout')">Proceder al Pago</button>
+                    </div>
+                `;
+            };
+            
+            this.updateCartQuantity = (productId, quantity) => {
+                const item = this.state.cart.find(i => i.id === productId);
+                if(item) {
+                    item.quantity = parseInt(quantity);
+                    if(item.quantity < 1) item.quantity = 1;
+                    this.renderCart();
+                    this.updateCartCount();
+                }
+            };
+
+            this.removeFromCart = (productId) => {
+                this.state.cart = this.state.cart.filter(i => i.id !== productId);
+                this.renderCart();
+                this.updateCartCount();
+            };
+
+            this.applyFilters = () => {
+                const searchTerm = document.getElementById('filter-search').value.toLowerCase();
+                const category = document.getElementById('filter-category').value;
+                const brand = document.getElementById('filter-brand').value;
+                const price = parseInt(document.getElementById('filter-price').value);
+
+                const filtered = this.state.products.filter(p => {
+                    const matchesSearch = p.name.toLowerCase().includes(searchTerm) || p.description.toLowerCase().includes(searchTerm);
+                    const matchesCategory = category === 'all' || p.category === category;
+                    const matchesBrand = brand === 'all' || p.brand === brand;
+                    const matchesPrice = p.price <= price;
+                    return matchesSearch && matchesCategory && matchesBrand && matchesPrice;
+                });
+                this.renderProducts(filtered);
+            };
+
+            this.setupEventListeners = () => {
+                document.getElementById('filter-price').addEventListener('input', (e) => {
+                    document.getElementById('price-value').innerText = `$${e.target.value}`;
+                });
+            };
+            
+            this.nextCheckoutStep = (step) => {
+                document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+                document.getElementById(`checkout-step-${step}`).classList.add('active');
+
+                document.querySelectorAll('[id^="step-indicator-"]').forEach(i => {
+                    i.classList.remove('text-blue-900', 'border-blue-900');
+                    i.classList.add('text-gray-500');
+                });
+                
+                for(let i=1; i<=step; i++){
+                    const indicator = document.getElementById(`step-indicator-${i}`);
+                    indicator.classList.add('text-blue-900');
+                    if(i === step) indicator.classList.add('border-b-4', 'border-blue-900');
+                }
+            };
+
+            this.resetCheckout = () => {
+                this.nextCheckoutStep(1);
+            };
+
+            this.initCharts = () => {
+                const salesCtx = document.getElementById('salesChart')?.getContext('2d');
+                if (salesCtx) {
+                    new Chart(salesCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio'],
+                            datasets: [{
+                                label: 'Ventas (miles de $)',
+                                data: [12, 19, 3, 5, 2, 3],
+                                backgroundColor: 'rgba(30, 58, 138, 0.9)', 
+                                borderColor: 'rgba(30, 58, 138, 1)', 
+                                borderWidth: 1
+                            }]
+                        },
+                        options: { scales: { y: { beginAtZero: true } }, maintainAspectRatio: false }
+                    });
+                }
+
+                const categoryCtx = document.getElementById('categoryChart')?.getContext('2d');
+                if (categoryCtx) {
+                    new Chart(categoryCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Eléctricas', 'Manuales', 'Pinturas', 'Fijaciones'],
+                            datasets: [{
+                                label: 'Ventas por Categoría',
+                                data: [300, 50, 100, 80],
+                                backgroundColor: ['#1e3a8a', '#9ca3af', '#f59e0b', '#374151'], 
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: { maintainAspectRatio: false }
+                    });
+                }
+            };
+            
+            this.toggleMobileMenu = () => {
+                document.getElementById('mobile-menu').classList.toggle('hidden');
+            };
+
+            this.toggleAiAssistant = () => {
+                document.getElementById('ai-assistant-modal').classList.toggle('hidden');
+            };
+            
+            this.sendAiMessage = (event) => {
+                event.preventDefault();
+                const input = document.getElementById('ai-input');
+                const chatBody = document.getElementById('ai-chat-body');
+                const userMessage = input.value.trim();
+
+                if(userMessage === '') return;
+
+                chatBody.innerHTML += `<div class="text-right mb-4"><div class="inline-block bg-blue-700 text-white rounded-lg p-3">${userMessage}</div></div>`;
+                input.value = '';
+                chatBody.scrollTop = chatBody.scrollHeight;
+                
+                setTimeout(() => {
+                    const aiResponse = 'Soy una simulación de IA. Para una recomendación de taladro para concreto, te sugeriría un modelo percutor de al menos 750W. La marca Bosch tiene excelentes opciones en su línea "Professional".';
+                    chatBody.innerHTML += `<div class="text-left mb-4"><div class="inline-block bg-gray-200 rounded-lg p-3">${aiResponse}</div></div>`;
+                    chatBody.scrollTop = chatBody.scrollHeight;
+                }, 1000);
+            }
+        };
+
+        const app = new App();
+        window.onload = app.init;
+    </script>
+</body>
+</html>
